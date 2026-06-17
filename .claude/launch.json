@@ -1,0 +1,20 @@
+﻿{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "C:\\\\Users\\\\mvel2\\\\OneDrive\\\\Desktop\\\\Internship\\\\Agentic LinkedIn App\\\\backend\\\\.venv\\\\Scripts\\\\python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--port", "8000", "--reload"],
+      "cwd": "C:\\\\Users\\\\mvel2\\\\OneDrive\\\\Desktop\\\\Internship\\\\Agentic LinkedIn App\\\\backend",
+      "port": 8000,
+      "env": { "PYTHONUTF8": "1" }
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "C:\\\\Users\\\\mvel2\\\\OneDrive\\\\Desktop\\\\Internship\\\\Agentic LinkedIn App\\\\frontend",
+      "port": 5173
+    }
+  ]
+}

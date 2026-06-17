@@ -1,0 +1,24 @@
+# Python
+backend/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+backend/quantrix.db
+backend/app/uploads/
+backend/tests/_*.html
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/vite.log
+frontend/vite.err.log
+
+# Env / secrets — keep .env.example but never the real .env
+backend/.env
+*.local
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

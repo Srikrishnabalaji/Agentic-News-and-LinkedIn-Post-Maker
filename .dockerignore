@@ -1,0 +1,18 @@
+# Python
+backend/.venv/
+**/__pycache__/
+**/*.pyc
+backend/quantrix.db
+backend/tests/_*.html
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/vite.log
+frontend/vite.err.log
+
+# Misc
+.git/
+.claude/
+*.md
+.env

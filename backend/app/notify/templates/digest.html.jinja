@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin:0;padding:0;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1d2226;">
+  <div style="max-width:640px;margin:0 auto;padding:24px;">
+
+    <div style="text-align:center;padding:8px 0 20px;">
+      <div style="font-size:22px;font-weight:700;color:#0a66c2;">QuantrixLabs</div>
+      <div style="font-size:13px;color:#56687a;">Daily LinkedIn Brief &middot; {{ run_date }}</div>
+    </div>
+
+    <div style="background:#ffffff;border-radius:12px;padding:20px 22px;margin-bottom:18px;">
+      <p style="margin:0 0 6px;font-size:16px;font-weight:600;">
+        {{ posts|length }} ready-to-edit drafts are waiting for you.
+      </p>
+      <p style="margin:0;font-size:14px;color:#56687a;line-height:1.5;">
+        Today's top cybersecurity stories, turned into LinkedIn posts for the
+        general public. Review, edit, pick the best, and publish.
+      </p>
+      <a href="{{ editor_url }}"
+         style="display:inline-block;margin-top:14px;background:#0a66c2;color:#fff;
+                text-decoration:none;font-weight:600;font-size:14px;
+                padding:10px 20px;border-radius:24px;">Open the editor →</a>
+    </div>
+
+    {% for p in posts %}
+    <div style="background:#ffffff;border-radius:12px;overflow:hidden;margin-bottom:16px;border:1px solid #e3e6ea;">
+      {% if p.image_url %}
+      <img src="{{ p.image_url }}" alt=""
+           style="width:100%;height:180px;object-fit:cover;display:block;" />
+      {% endif %}
+      <div style="padding:16px 18px;">
+        <div style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;
+                    color:#0a66c2;font-weight:700;margin-bottom:6px;">
+          {{ p.format_label }}{% if p.is_pivotal %} &middot; ⚡ Pivotal{% endif %}
+        </div>
+        <div style="font-size:15px;font-weight:600;margin-bottom:6px;line-height:1.35;">
+          {{ p.headline }}
+        </div>
+        <div style="font-size:13px;color:#43536b;line-height:1.55;">
+          {{ p.preview }}
+        </div>
+        <div style="font-size:12px;color:#8a97a6;margin-top:10px;">
+          Source: {{ p.source_name }}
+          {% if not p.image_recommended %}&middot; AI suggests no image{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+
+    <p style="text-align:center;font-size:12px;color:#8a97a6;margin-top:24px;">
+      Generated automatically by the QuantrixLabs LinkedIn Agent.
+    </p>
+  </div>
+</body>
+</html>
