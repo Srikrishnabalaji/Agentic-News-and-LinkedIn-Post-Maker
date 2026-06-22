@@ -124,7 +124,7 @@ export default function PostEditor({ post, onChange, readOnly }: Props) {
         </div>
 
         <ImagePicker
-          key={post.id}
+          key={`${post.id}-${post.image_options?.[0]?.url ?? ''}`}
           recommended={post.image_recommended}
           reason={post.image_reason}
           currentUrl={post.image_url}
@@ -178,21 +178,34 @@ export default function PostEditor({ post, onChange, readOnly }: Props) {
         )}
 
         {!readOnly && (
-          <div className="flex gap-2">
-            <button
-              onClick={() => doAction("approve", () => api.setStatus(post.id, "approved"))}
-              disabled={!!busy}
-              className="text-sm px-4 py-1.5 rounded-full border border-linkedin text-linkedin font-semibold disabled:opacity-50"
-            >
-              Mark approved
-            </button>
-            <button
-              onClick={() => doAction("posted", () => api.setStatus(post.id, "posted"))}
-              disabled={!!busy}
-              className="text-sm px-4 py-1.5 rounded-full border border-green-600 text-green-700 font-semibold disabled:opacity-50"
-            >
-              Mark as posted
-            </button>
+          <div className="flex flex-wrap gap-2">
+            {post.status === "draft" && (
+              <button
+                onClick={() => doAction("approve", () => api.setStatus(post.id, "approved"))}
+                disabled={!!busy}
+                className="text-sm px-4 py-1.5 rounded-full border border-linkedin text-linkedin font-semibold disabled:opacity-50"
+              >
+                Mark approved
+              </button>
+            )}
+            {post.status !== "posted" && (
+              <button
+                onClick={() => doAction("posted", () => api.setStatus(post.id, "posted"))}
+                disabled={!!busy}
+                className="text-sm px-4 py-1.5 rounded-full border border-green-600 text-green-700 font-semibold disabled:opacity-50"
+              >
+                Mark as posted
+              </button>
+            )}
+            {post.status !== "draft" && (
+              <button
+                onClick={() => doAction("revert", () => api.setStatus(post.id, "draft"))}
+                disabled={!!busy}
+                className="text-sm px-4 py-1.5 rounded-full border border-gray-400 text-gray-600 font-semibold disabled:opacity-50"
+              >
+                ↩ Revert to draft
+              </button>
+            )}
           </div>
         )}
       </div>

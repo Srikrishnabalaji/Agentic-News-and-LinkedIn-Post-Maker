@@ -53,6 +53,11 @@ export default function History() {
               <span className="flex-1 text-sm text-gray-800 truncate">
                 {p.is_pivotal && "⚡ "}
                 {p.headline}
+                {p.is_update && (
+                  <span className="ml-1.5 text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded bg-amber-100 text-amber-700 align-middle">
+                    Update
+                  </span>
+                )}
               </span>
               <span className="text-xs text-gray-400">
                 {new Date(p.created_at).toLocaleDateString()}

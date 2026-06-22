@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import Dashboard from "./pages/Dashboard";
 import History from "./pages/History";
@@ -10,6 +10,8 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [run, setRun] = useState<Run | null>(null);
   const [triggering, setTriggering] = useState(false);
+  const [dashboardRefresh, setDashboardRefresh] = useState(0);
+  const prevRunStatus = useRef<string | null>(null);
 
   const refreshRun = () => api.latestRun().then(setRun).catch(() => {});
 
@@ -22,6 +24,14 @@ export default function App() {
     if (run?.status !== "running") return;
     const t = setInterval(refreshRun, 4000);
     return () => clearInterval(t);
+  }, [run?.status]);
+
+  // When a run transitions running → completed, reload Dashboard posts.
+  useEffect(() => {
+    if (prevRunStatus.current === "running" && run?.status === "completed") {
+      setDashboardRefresh((n) => n + 1);
+    }
+    prevRunStatus.current = run?.status ?? null;
   }, [run?.status]);
 
   const trigger = async () => {
@@ -87,7 +97,7 @@ export default function App() {
         </div>
       </header>
 
-      {tab === "dashboard" ? <Dashboard /> : <History />}
+      {tab === "dashboard" ? <Dashboard refreshTrigger={dashboardRefresh} /> : <History />}
     </div>
   );
 }

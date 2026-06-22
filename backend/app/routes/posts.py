@@ -113,7 +113,7 @@ def regenerate_post(post_id: int, db: Session = Depends(get_db)):
         published_at=source.published_at, lead_image_url=source.lead_image_url,
         full_text=source.full_text or "",
     )
-    gen = generate_post(cand)
+    gen = generate_post(cand, category=post.category)
 
     post.headline = gen.headline
     post.body = gen.body

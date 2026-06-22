@@ -4,7 +4,11 @@ import PostEditor from "../components/PostEditor";
 import StatusBadge from "../components/StatusBadge";
 import { FORMAT_LABELS, type Post } from "../types";
 
-export default function Dashboard() {
+interface Props {
+  refreshTrigger?: number;
+}
+
+export default function Dashboard({ refreshTrigger }: Props) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,7 +31,7 @@ export default function Dashboard() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refreshTrigger]);
 
   const onChange = (updated: Post) =>
     setPosts((ps) => ps.map((p) => (p.id === updated.id ? updated : p)));
