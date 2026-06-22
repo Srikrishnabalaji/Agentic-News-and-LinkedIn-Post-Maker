@@ -124,6 +124,7 @@ export default function PostEditor({ post, onChange, readOnly }: Props) {
         </div>
 
         <ImagePicker
+          key={post.id}
           recommended={post.image_recommended}
           reason={post.image_reason}
           currentUrl={post.image_url}
