@@ -76,6 +76,7 @@ class Source(Base):
     topic_key: Mapped[str | None] = mapped_column(String(256), index=True, nullable=True)
     score: Mapped[float] = mapped_column(Float, default=0.0)
     scraped_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    category: Mapped[str] = mapped_column(String(32), default="security")
 
     run: Mapped["DailyRun"] = relationship(back_populates="sources")
     post: Mapped["Post"] = relationship(back_populates="source", uselist=False)
@@ -108,6 +109,8 @@ class Post(Base):
     source_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     topic_key: Mapped[str | None] = mapped_column(String(256), index=True, nullable=True)
     is_pivotal: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_update: Mapped[bool] = mapped_column(Boolean, default=False)
+    category: Mapped[str] = mapped_column(String(32), default="security", index=True)
 
     # --- Review lifecycle ---
     status: Mapped[PostStatus] = mapped_column(

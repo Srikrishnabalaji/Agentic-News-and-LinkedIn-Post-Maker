@@ -38,6 +38,8 @@ class PostOut(BaseModel):
     source_name: str | None
     topic_key: str | None
     is_pivotal: bool
+    is_update: bool = False
+    category: str = "security"
 
     status: PostStatus
     created_at: datetime

@@ -26,6 +26,8 @@ export interface Post {
   source_name: string | null;
   topic_key: string | null;
   is_pivotal: boolean;
+  is_update: boolean;
+  category: string;
   status: PostStatus;
   created_at: string;
   updated_at: string;

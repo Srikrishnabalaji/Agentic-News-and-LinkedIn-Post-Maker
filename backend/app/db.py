@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .config import settings
@@ -40,8 +40,25 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def _apply_migrations() -> None:
+    """Idempotent column additions for existing databases."""
+    migrations = [
+        "ALTER TABLE posts ADD COLUMN category VARCHAR(32) NOT NULL DEFAULT 'security'",
+        "ALTER TABLE sources ADD COLUMN category VARCHAR(32) NOT NULL DEFAULT 'security'",
+        "ALTER TABLE posts ADD COLUMN is_update BOOLEAN NOT NULL DEFAULT 0",
+    ]
+    with engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass  # column already exists
+
+
 def init_db() -> None:
     """Create tables if they do not exist (used for local/dev + first boot)."""
     from . import models  # noqa: F401  (ensure models are registered)
 
     Base.metadata.create_all(bind=engine)
+    _apply_migrations()

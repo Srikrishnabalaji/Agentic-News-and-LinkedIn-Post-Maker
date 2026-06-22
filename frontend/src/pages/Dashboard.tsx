@@ -43,35 +43,54 @@ export default function Dashboard() {
       </div>
     );
 
+  const securityPosts = posts.filter((p) => p.category === "security");
+  const financePosts = posts.filter((p) => p.category === "finance");
+
+  const sections = [
+    { label: "Security", color: "text-linkedin", posts: securityPosts },
+    { label: "Finance", color: "text-emerald-600", posts: financePosts },
+  ].filter((s) => s.posts.length > 0);
+
   return (
     <div className="flex gap-6 p-6 max-w-[1400px] mx-auto">
-      {/* Left rail: the 5 drafts */}
-      <aside className="w-64 shrink-0 space-y-2">
-        <h2 className="text-xs font-semibold text-gray-400 uppercase px-1">
-          Today · {posts.length} drafts
-        </h2>
-        {posts.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => setSelectedId(p.id)}
-            className={`w-full text-left p-3 rounded-lg border transition ${
-              p.id === selectedId
-                ? "border-linkedin bg-white shadow-sm"
-                : "border-transparent bg-white/60 hover:bg-white"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] uppercase tracking-wide text-linkedin font-semibold">
-                {FORMAT_LABELS[p.format_type] ?? p.format_type}
-              </span>
-              <StatusBadge status={p.status} />
+      {/* Left rail: two sections */}
+      <aside className="w-64 shrink-0 space-y-5">
+        {sections.map((section) => (
+          <div key={section.label}>
+            <h2 className="text-xs font-semibold text-gray-400 uppercase px-1 mb-2">
+              {section.label} · {section.posts.length} drafts
+            </h2>
+            <div className="space-y-2">
+              {section.posts.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedId(p.id)}
+                  className={`w-full text-left p-3 rounded-lg border transition ${
+                    p.id === selectedId
+                      ? "border-linkedin bg-white shadow-sm"
+                      : "border-transparent bg-white/60 hover:bg-white"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-[10px] uppercase tracking-wide font-semibold ${section.color}`}>
+                      {FORMAT_LABELS[p.format_type] ?? p.format_type}
+                    </span>
+                    <StatusBadge status={p.status} />
+                  </div>
+                  <div className="text-sm text-gray-800 line-clamp-2 leading-snug">
+                    {p.is_pivotal && "⚡ "}
+                    {p.headline}
+                  </div>
+                  {p.is_update && (
+                    <span className="inline-block mt-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
+                      Update
+                    </span>
+                  )}
+                  <div className="text-[11px] text-gray-400 mt-1">{p.source_name}</div>
+                </button>
+              ))}
             </div>
-            <div className="text-sm text-gray-800 line-clamp-2 leading-snug">
-              {p.is_pivotal && "⚡ "}
-              {p.headline}
-            </div>
-            <div className="text-[11px] text-gray-400 mt-1">{p.source_name}</div>
-          </button>
+          </div>
         ))}
       </aside>
 

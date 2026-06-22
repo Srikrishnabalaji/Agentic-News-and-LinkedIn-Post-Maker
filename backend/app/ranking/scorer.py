@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 
 from ..utils import TFIDFVectorizer, cosine_sim, same_story
 
-# Words signalling direct relevance to everyday people.
+# Words signalling direct relevance to everyday people (security stories).
 _PUBLIC_IMPACT_TERMS = {
     "password", "passwords", "phishing", "scam", "scams", "fraud", "bank",
     "banking", "credit card", "identity theft", "breach", "data breach",
@@ -33,6 +33,20 @@ _PUBLIC_IMPACT_TERMS = {
     "deepfake", "voice clone", "child", "children", "elderly", "shopping",
     "paypal", "venmo", "crypto", "wallet", "email", "text message", "sms",
     "qr code", "subscription", "refund",
+}
+
+# Finance-specific terms signalling relevance to everyday people's money.
+_FINANCE_IMPACT_TERMS = {
+    "inflation", "interest rate", "interest rates", "fed", "federal reserve",
+    "recession", "mortgage", "rent", "housing", "savings", "retirement",
+    "401k", "ira", "pension", "social security", "tax", "taxes", "refund",
+    "debt", "student loan", "credit score", "credit card", "bank", "banks",
+    "layoffs", "job", "jobs", "unemployment", "wages", "salary", "raise",
+    "cost of living", "grocery", "groceries", "gas prices", "energy",
+    "stock market", "stocks", "investing", "etf", "index fund", "dividend",
+    "crypto", "bitcoin", "earnings", "gdp", "budget", "spending",
+    "consumer", "consumers", "millions", "billions", "economy", "economic",
+    "tariff", "tariffs", "trade", "dollar", "exchange rate",
 }
 
 # Signals that a story is pivotal enough to cover even if recently posted.
@@ -83,10 +97,10 @@ def _recency_score(published_at: datetime | None, now: datetime) -> float:
     return 0.1
 
 
-def _public_impact_score(text: str) -> float:
+def _public_impact_score(text: str, category: str = "security") -> float:
     low = text.lower()
-    hits = sum(1 for term in _PUBLIC_IMPACT_TERMS if term in low)
-    # Saturating curve: a few strong signals already mean high relevance.
+    terms = _FINANCE_IMPACT_TERMS if category == "finance" else _PUBLIC_IMPACT_TERMS
+    hits = sum(1 for term in terms if term in low)
     return min(1.0, hits / 5.0)
 
 
@@ -122,7 +136,7 @@ def score_candidate(
     """Compute and attach `.score`, `.score_breakdown` to a Candidate."""
     text = f"{cand.title} {cand.summary} {cand.full_text}"
     recency = _recency_score(cand.published_at, now)
-    impact = _public_impact_score(text)
+    impact = _public_impact_score(text, getattr(cand, "category", "security"))
     authority = cand.authority
     # Consumer-facing sources get a small mission-fit nudge.
     if cand.audience == "consumer":

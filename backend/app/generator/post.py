@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass, field
 
 from ..config import settings
-from .brand import BRAND_BRIEF, FORMAT_GUIDE, POST_FORMATS
+from .brand import FORMAT_GUIDE, POST_FORMATS, get_brand_brief
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +48,9 @@ _DRAFT_TOOL = {
                 "type": "array",
                 "items": {"type": "string"},
                 "description": "3-6 relevant hashtags WITHOUT the # symbol. "
-                               "Include CyberSecurity and QuantrixLabs.",
+                               "Always include QuantrixLabs. "
+                               "For security topics include CyberSecurity; "
+                               "for finance topics include Finance or Economy instead.",
             },
             "image_recommended": {
                 "type": "boolean",
@@ -109,21 +111,20 @@ def _normalize_hashtags(tags: list[str]) -> list[str]:
     return out[:6]
 
 
-def _generate_with_gemini(cand) -> GeneratedPost:
+def _generate_with_gemini(cand, category: str = "security") -> GeneratedPost:
     import json
     from google import genai
     from google.genai import types
 
     client = genai.Client(api_key=settings.gemini_api_key)
     schema = _DRAFT_TOOL["input_schema"]
-    # Build Gemini function declaration from the shared schema.
     fn = types.FunctionDeclaration(
         name=_DRAFT_TOOL["name"],
         description=_DRAFT_TOOL["description"],
         parameters=schema,
     )
     config = types.GenerateContentConfig(
-        system_instruction=BRAND_BRIEF,
+        system_instruction=get_brand_brief(category),
         tools=[types.Tool(function_declarations=[fn])],
         tool_config=types.ToolConfig(
             function_calling_config=types.FunctionCallingConfig(
@@ -152,12 +153,11 @@ def _generate_with_gemini(cand) -> GeneratedPost:
     )
 
 
-def _generate_with_openai(cand) -> GeneratedPost:
+def _generate_with_openai(cand, category: str = "security") -> GeneratedPost:
     import json
     import openai
 
     client = openai.OpenAI(api_key=settings.openai_api_key)
-    # Convert the Anthropic tool schema to OpenAI function format.
     fn = {
         "type": "function",
         "function": {
@@ -170,7 +170,7 @@ def _generate_with_openai(cand) -> GeneratedPost:
         model=settings.openai_model,
         max_tokens=2000,
         messages=[
-            {"role": "system", "content": BRAND_BRIEF},
+            {"role": "system", "content": get_brand_brief(category)},
             {"role": "user", "content": _build_user_prompt(cand)},
         ],
         tools=[fn],
@@ -189,14 +189,14 @@ def _generate_with_openai(cand) -> GeneratedPost:
     )
 
 
-def _generate_with_claude(cand) -> GeneratedPost:
+def _generate_with_claude(cand, category: str = "security") -> GeneratedPost:
     import anthropic
 
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
     resp = client.messages.create(
         model=settings.anthropic_model,
         max_tokens=2000,
-        system=BRAND_BRIEF,
+        system=get_brand_brief(category),
         tools=[_DRAFT_TOOL],
         tool_choice={"type": "tool", "name": "draft_linkedin_post"},
         messages=[{"role": "user", "content": _build_user_prompt(cand)}],
@@ -248,7 +248,7 @@ _TONE_GUIDE = {
 }
 
 
-def rephrase_body(body: str, tone: str) -> str:
+def rephrase_body(body: str, tone: str, category: str = "security") -> str:
     """Rephrase a post body in a given tone. Uses Gemini → OpenAI → Claude fallback."""
     guide = _TONE_GUIDE.get(tone, _TONE_GUIDE["punchy"])
     prompt = (
@@ -264,7 +264,7 @@ def rephrase_body(body: str, tone: str) -> str:
                 model=settings.gemini_model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    system_instruction=BRAND_BRIEF,
+                    system_instruction=get_brand_brief(category),
                     max_output_tokens=1500,
                 ),
             )
@@ -307,22 +307,22 @@ def rephrase_body(body: str, tone: str) -> str:
     return prefix + body
 
 
-def generate_post(cand) -> GeneratedPost:
+def generate_post(cand, category: str = "security") -> GeneratedPost:
     if settings.has_gemini:
         try:
-            return _generate_with_gemini(cand)
+            return _generate_with_gemini(cand, category)
         except Exception as exc:
             log.error("Gemini generation failed for %r, trying OpenAI: %s",
                       cand.title[:60], exc)
     if settings.has_openai:
         try:
-            return _generate_with_openai(cand)
+            return _generate_with_openai(cand, category)
         except Exception as exc:
             log.error("OpenAI generation failed for %r, trying Claude: %s",
                       cand.title[:60], exc)
     if settings.has_anthropic:
         try:
-            return _generate_with_claude(cand)
+            return _generate_with_claude(cand, category)
         except Exception as exc:
             log.error("Claude generation failed for %r, using mock: %s",
                       cand.title[:60], exc)
