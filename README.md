@@ -1,33 +1,40 @@
 # QuantrixLabs LinkedIn Agent
 
-An agentic system that, every morning, scans trusted cybersecurity news,
-turns the most public-relevant stories into ready-to-edit LinkedIn drafts
-(in the voice of QuantrixLabs' Chief Social Media Handler), finds free
-images, emails you a digest, and gives you a web app to edit, preview, and
-approve — then copy into LinkedIn yourself.
+An agentic content pipeline that monitors trusted cybersecurity and finance news sources, generates polished LinkedIn drafts in QuantrixLabs' brand voice, and surfaces them in a review interface for a human editor to approve and publish.
 
-> Posting is **human-in-the-loop**: the app prepares finished drafts; a person
-> reviews, edits, and publishes. The architecture has a reserved slot for the
-> LinkedIn API so automated publishing can be added later with no schema change.
+Posting is **human-in-the-loop** by design. The agent handles research, writing, and image sourcing; a person makes the final call on what goes live. The architecture reserves a slot for direct LinkedIn API publishing when that integration is ready.
 
 ---
 
-## How it works
+## What it does
 
-```
- 11 AM cron ─► scrape RSS (10 trusted sources)
-              └► rank (recency · public impact · novelty · authority)
-                 └► top 5 ─► Claude writes posts (picks format, hashtags, image call)
-                            └► find free images (Unsplash/Pexels/Wikimedia/article)
-                               └► save to DB ─► email digest ─► review in web app
-```
+Every morning the pipeline runs automatically:
 
-- **Novelty:** a topic posted in the last 7 days is skipped — unless it is
-  flagged *pivotal* (e.g. an actively-exploited zero-day), which is covered
-  regardless. History is retained ~14 days.
-- **Offline-friendly:** with no API keys the pipeline still runs end-to-end
-  using a deterministic mock generator and keyless image sources, so you can
-  test everything before wiring up accounts.
+1. **Scrapes** RSS feeds across trusted cybersecurity and finance sources
+2. **Ranks** stories by recency, public impact, novelty, and source authority
+3. **Generates** up to 5 LinkedIn posts — selecting the appropriate format (listicle, hot take, explainer, etc.), hashtags, and image recommendations
+4. **Sources images** from Unsplash, Pexels, Wikimedia Commons, or the article itself
+5. **Emails** a digest so the editor knows new drafts are ready
+6. **Saves** everything to the database for review
+
+A topic covered in the last 7 days is automatically skipped to avoid repetition — unless it is flagged *pivotal* (e.g. an actively-exploited zero-day), in which case it is always covered.
+
+---
+
+## The editor interface
+
+The web app gives the editor full control over each draft before anything goes live:
+
+- **Dashboard** — view today's generated drafts by category, edit post body and headline, rephrase with AI (punchy / formal / shorter), pick or swap images, manage hashtags, and preview exactly how the post will render on LinkedIn
+- **History** — browse all past drafts with status tracking; open any previous post back in the editor
+- **Search** — search across saved posts or run a live web search to pull in new stories on demand
+- **Sources** — manage the RSS feeds the pipeline monitors
+- **Candidate drawer** — pull additional stories into the dashboard outside of the scheduled run
+- **Metrics** — record and track post performance (impressions, likes, comments) after publishing
+
+Posts move through a `draft → approved → posted` workflow. The editor copies the final text and image to LinkedIn manually; a tagging reminder surfaces if the post contains `@mentions`.
+
+---
 
 ## Tech stack
 
@@ -35,122 +42,68 @@ approve — then copy into LinkedIn yourself.
 |---|---|
 | Backend | Python 3.11, FastAPI, SQLAlchemy 2 |
 | Scraping | feedparser + httpx + BeautifulSoup |
-| AI | Anthropic Claude (`claude-sonnet-4-6` default; set `claude-opus-4-8` for best writing) |
-| DB | SQLite locally · PostgreSQL on Railway |
-| Email | Gmail SMTP (App Password) + Jinja2 |
-| Frontend | React 19 + Vite + TailwindCSS |
-| Deploy | Docker on Railway (one web service + one cron service + Postgres) |
+| AI | Gemini · OpenAI · Anthropic Claude (tried in order, first available key wins) |
+| Web search | Tavily |
+| Images | Unsplash · Pexels · Wikimedia Commons · article lead image |
+| Database | SQLite (local) · PostgreSQL (production) |
+| Email | Gmail SMTP + Jinja2 |
+| Frontend | React 19, Vite, Tailwind CSS |
+| Deployment | Docker on Railway (web service + cron service + Postgres) |
 
 ---
 
-## Local development
+## Setup
 
-### 1. Backend
+All configuration is via environment variables. Copy `backend/.env.example` to `backend/.env` and fill in the relevant values. See the example file for the full list.
+
+### Backend
 
 ```bash
 cd backend
 python -m venv .venv
-.venv\Scripts\activate            # Windows  (source .venv/bin/activate on macOS/Linux)
+.venv\Scripts\activate       # Windows — use source .venv/bin/activate on macOS/Linux
 pip install -r requirements.txt
-copy .env.example .env            # then fill in keys (optional for a mock run)
 uvicorn app.main:app --reload --port 8000
 ```
 
-Run the daily pipeline once (what the cron does):
+To run the pipeline manually (equivalent to the scheduled cron):
 
 ```bash
 python -m app.cli run
 ```
 
-### 2. Frontend
+### Frontend
 
 ```bash
 cd frontend
 npm install
-npm run dev                       # http://localhost:5173 (proxies /api to :8000)
-```
-
-### Tests / smoke checks
-
-```bash
-cd backend
-python -m tests.smoke_scraper     # live RSS across all sources
-python -m tests.smoke_ranker      # scoring logic assertions
-python -m tests.smoke_generator   # generation (mock unless ANTHROPIC_API_KEY set)
-python -m tests.smoke_images      # live Wikimedia image search
-python -m tests.smoke_email       # renders tests/_digest_preview.html
+npm run dev                  # http://localhost:5173 — proxies /api requests to :8000
 ```
 
 ---
 
-## Configuration
+## Deployment (Railway)
 
-All config is via environment variables — see [`backend/.env.example`](backend/.env.example).
-Everything except the database is optional for a local mock run.
+The repo builds as a single Docker image serving both the API and the compiled frontend.
 
-### Gmail App Password (for the digest email)
+1. **Postgres** — add the PostgreSQL plugin; Railway injects `DATABASE_URL` automatically.
+2. **Web service** — deploy from this repo. Set all required environment variables from `.env.example` in the Railway Variables tab.
+3. **Cron service** — same image, start command `python -m app.cli run`, schedule `0 11 * * *`.
 
-1. Enable 2-Step Verification on the `quantrixlabs@gmail.com` Google account.
-2. Go to **Google Account → Security → App passwords**.
-3. Generate a password for "Mail"; copy the 16-character value.
-4. Set `GMAIL_ADDRESS=quantrixlabs@gmail.com` and `GMAIL_APP_PASSWORD=<that value>`.
-
-App Passwords are revocable and scoped to mail only — safer than your real
-password, and they bypass the interactive login that blocks plain SMTP.
-
-### Image API keys (optional)
-
-- **Unsplash:** register a free app at unsplash.com/developers → `UNSPLASH_ACCESS_KEY`.
-- **Pexels:** free key at pexels.com/api → `PEXELS_API_KEY`.
-- Without either, the agent still sources images from **Wikimedia Commons**
-  (no key) and each article's own lead image (flagged "verify reuse rights").
+Railway cron runs in UTC — adjust the hour to match your target local time.
 
 ---
 
-## Deploy to Railway
+## LinkedIn API integration (roadmap)
 
-The repo builds as a **single Docker image** that serves both the API and the
-compiled frontend. You create three things in your Railway project:
+The data model already reserves `posts.linkedin_post_id`. When ready:
 
-### 1. Postgres
-Add the **PostgreSQL** plugin. Railway sets `DATABASE_URL` automatically;
-reference it from the services below.
+1. Register a LinkedIn developer app with the Community Management product and complete OAuth for the QuantrixLabs page.
+2. Store the OAuth token as a Railway secret.
+3. Add `POST /posts/{id}/publish` — calls the LinkedIn UGC Posts API and saves the returned ID.
+4. Replace the **Copy text** button with **Publish**.
 
-### 2. Web service (the app + API)
-- New service → Deploy from this repo. Railway picks up `railway.json` / `Dockerfile`.
-- **Variables:** `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `GMAIL_ADDRESS`,
-  `GMAIL_APP_PASSWORD`, `NOTIFICATION_EMAIL`, `FRONTEND_URL` (this service's
-  public URL), `UNSPLASH_ACCESS_KEY`/`PEXELS_API_KEY` (optional), and a
-  reference to `DATABASE_URL`.
-- Start command (from `railway.json`): `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-
-### 3. Cron service (the 11 AM run)
-- New service → same repo/image.
-- **Start command:** `python -m app.cli run`
-- **Cron schedule:** `0 11 * * *`
-- Same variables as the web service (it shares the database).
-
-> ⚠️ **Timezone:** Railway cron runs in **UTC**. `0 11 * * *` fires at 11:00 UTC.
-> Adjust the hour to hit 11 AM in your local timezone (e.g. for US Eastern in
-> summer / EDT use `0 15 * * *`). Tell me your timezone and I'll set it exactly.
-
-When the cron finishes it writes the day's drafts to Postgres and emails the
-digest; open the web service URL to review.
-
----
-
-## Adding automated LinkedIn posting later
-
-The data model already reserves `posts.linkedin_post_id`. To go live:
-
-1. Register a LinkedIn developer app (Community Management / "Share on
-   LinkedIn" product) and complete OAuth for the QuantrixLabs page.
-2. Store the OAuth token (add a small `credentials` table or a Railway secret).
-3. Add `POST /posts/{id}/publish` that calls the LinkedIn UGC/Posts API and
-   saves the returned id into `linkedin_post_id`.
-4. Swap the frontend's **Copy text** for a **Publish** button.
-
-No other architectural changes are required.
+No schema or architectural changes are required beyond the above.
 
 ---
 
@@ -159,22 +112,23 @@ No other architectural changes are required.
 ```
 backend/
   app/
-    config.py            settings (env vars)
-    db.py  models.py      SQLAlchemy (SQLite/Postgres)
+    config.py            environment variable settings
+    db.py  models.py     SQLAlchemy models (SQLite / Postgres)
     scraper/             rss.py · article.py · sources.py
     ranking/scorer.py    deterministic story scoring
-    generator/           brand.py · post.py (Claude) · images.py
-    notify/email.py      Gmail SMTP digest + Jinja2 template
-    routes/              posts · images · runs
-    pipeline.py          the daily orchestrator
-    cli.py               `python -m app.cli run` (cron entrypoint)
-    main.py              FastAPI app (+ serves built frontend)
+    generator/           brand.py · post.py · build.py · images.py
+    notify/email.py      Gmail digest + Jinja2 template
+    routes/              posts · candidates · search · sources · images · runs
+    pipeline.py          daily orchestrator
+    cli.py               cron entrypoint
+    main.py              FastAPI app (also serves compiled frontend)
   tests/                 smoke_*.py
 frontend/
   src/
     api.ts  types.ts
     components/          PostEditor · LinkedInPreview · ImagePicker · HashtagEditor
-    pages/               Dashboard · History
+                         · FormattingToolbar · CandidateDrawer · MetricsPanel
+    pages/               Dashboard · History · Search · Sources
     App.tsx
 Dockerfile  railway.json
 ```
