@@ -173,16 +173,43 @@ def deduplicate(
     return [c for i, c in enumerate(url_deduped) if i in kept_indices]
 
 
-def fetch_all(max_items_per_source: int = 15) -> dict[str, list[Candidate]]:
-    """Fetch all sources and return candidates grouped by category.
+def _active_sources(db) -> list[NewsSource]:
+    """Return enabled feeds from the DB, falling back to the hardcoded list.
 
-    Deduplication runs separately within each category so a finance story
-    can't collide with a security story (they share no vocabulary).
-    Returns {"security": [...], "finance": [...]} — each list is deduped
-    and sorted by recency (newest first, matching feed order).
+    Keeps the scraper working offline / in tests (no db) and resilient if the
+    rss_sources table is somehow empty.
+    """
+    if db is None:
+        return list(SOURCES)
+    from sqlalchemy import select
+
+    from ..models import RSSSource
+
+    rows = db.execute(
+        select(RSSSource).where(RSSSource.enabled.is_(True))
+    ).scalars().all()
+    if not rows:
+        return list(SOURCES)
+    return [
+        NewsSource(
+            name=r.name, feed_url=r.url, authority=r.authority,
+            audience=r.audience, category=r.category,
+        )
+        for r in rows
+    ]
+
+
+def fetch_all(db=None, max_items_per_source: int = 15) -> dict[str, list[Candidate]]:
+    """Fetch all enabled sources and return candidates grouped by category.
+
+    Reads the active feed list from the DB (rss_sources) when a session is
+    provided; otherwise uses the hardcoded SOURCES list. Deduplication runs
+    separately within each category so a finance story can't collide with a
+    security story. Returns {"security": [...], "finance": [...]} — each list
+    is deduped and sorted by recency (newest first, matching feed order).
     """
     by_category: dict[str, list[Candidate]] = {}
-    for source in SOURCES:
+    for source in _active_sources(db):
         cats = by_category.setdefault(source.category, [])
         cats.extend(fetch_source(source, max_items_per_source))
 

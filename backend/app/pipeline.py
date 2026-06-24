@@ -14,7 +14,15 @@ from sqlalchemy.orm import Session
 from .config import settings
 from .generator.images import find_images
 from .generator.post import generate_post
-from .models import DailyRun, Post, PostStatus, RunStatus, Source
+from .models import (
+    CandidateStatus,
+    DailyRun,
+    Post,
+    PostStatus,
+    RunStatus,
+    Source,
+    StoryCandidate,
+)
 from .notify.email import send_digest
 from .ranking.freshness import check_freshness_batch
 from .ranking.scorer import is_pivotal, rank, topic_key
@@ -48,6 +56,11 @@ def _prune_history(db: Session, retention_days: int) -> int:
     ).scalars().all()
     for s in old_sources:
         db.delete(s)
+    old_candidates = db.execute(
+        select(StoryCandidate).where(StoryCandidate.created_at < cutoff)
+    ).scalars().all()
+    for c in old_candidates:
+        db.delete(c)
     db.commit()
     return len(old_posts)
 
@@ -65,7 +78,7 @@ def run_pipeline(db: Session) -> PipelineResult:
         log.info("%d topics posted in last %d days (novelty filter)",
                  len(recent_keys), settings.novelty_window_days)
 
-        candidates_by_category = fetch_all()
+        candidates_by_category = fetch_all(db)
         total_candidates = sum(len(v) for v in candidates_by_category.values())
         run.num_candidates = total_candidates
 
@@ -182,6 +195,29 @@ def run_pipeline(db: Session) -> PipelineResult:
                 )
                 db.add(post)
                 created_posts.append(post)
+
+            # --- Persist the viable pool for the discovery/replacement feature ---
+            # Selected stories become posts (generated); the rest stay pending
+            # so the user can browse and generate from them on demand.
+            selected_urls = {c.url for c in selected}
+            for cand in all_novel + unchecked_72h:
+                cstatus = (
+                    CandidateStatus.generated
+                    if cand.url in selected_urls
+                    else CandidateStatus.pending
+                )
+                db.add(StoryCandidate(
+                    run_id=run.id, url=cand.url, title=cand.title,
+                    source_name=cand.source_name, summary=cand.summary,
+                    full_text=cand.full_text or None,
+                    lead_image_url=cand.lead_image_url,
+                    published_at=(cand.published_at.replace(tzinfo=None)
+                                  if cand.published_at else None),
+                    category=category, score=cand.score,
+                    topic_key=topic_key(cand.title),
+                    authority=cand.authority, audience=cand.audience,
+                    status=cstatus,
+                ))
 
         run.num_posts = len(created_posts)
         run.status = RunStatus.completed

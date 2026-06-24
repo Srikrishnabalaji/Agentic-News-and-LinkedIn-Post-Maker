@@ -2,12 +2,40 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 
 from ..config import settings
 from .brand import FORMAT_GUIDE, POST_FORMATS, get_brand_brief
 
 log = logging.getLogger(__name__)
+
+
+def _to_bold_char(c: str) -> str:
+    """Map an ASCII letter/digit to its Unicode sans-serif bold equivalent."""
+    if "A" <= c <= "Z":
+        return chr(0x1D5D4 + ord(c) - ord("A"))
+    if "a" <= c <= "z":
+        return chr(0x1D5EE + ord(c) - ord("a"))
+    if "0" <= c <= "9":
+        return chr(0x1D7EC + ord(c) - ord("0"))
+    return c
+
+
+def _apply_bold(text: str) -> str:
+    """Convert **marked** spans into LinkedIn-safe Unicode bold characters.
+
+    The AI is prompted to wrap key terms in **double asterisks**; LinkedIn has
+    no rich text, so we substitute the Mathematical Sans-Serif Bold code points
+    that render as bold in the feed. Deterministic and runs on every draft.
+    """
+    if "**" not in text:
+        return text
+
+    def repl(m: re.Match) -> str:
+        return "".join(_to_bold_char(c) for c in m.group(1))
+
+    return re.sub(r"\*\*(.+?)\*\*", repl, text, flags=re.DOTALL)
 
 
 @dataclass
@@ -223,7 +251,7 @@ def _generate_mock(cand) -> GeneratedPost:
         f"{snippet}\n\n"
         "Keep your software updated, use strong unique passwords, and turn on "
         "two-factor authentication wherever you can.\n\n"
-        "What's the one security habit you keep putting off? 👇\n\n"
+        "What's the one security habit you keep putting off?\n\n"
         f"(Source: {cand.source_name})"
     )
     return GeneratedPost(
@@ -269,7 +297,7 @@ def rephrase_body(body: str, tone: str, category: str = "security") -> str:
                 ),
             )
             text = resp.text.strip() if resp.text else ""
-            return text or body
+            return _apply_bold(text or body)
         except Exception as exc:
             log.error("Gemini rephrase failed: %s", exc)
     if settings.has_openai:
@@ -280,12 +308,12 @@ def rephrase_body(body: str, tone: str, category: str = "security") -> str:
                 model=settings.openai_model,
                 max_tokens=1500,
                 messages=[
-                    {"role": "system", "content": BRAND_BRIEF},
+                    {"role": "system", "content": get_brand_brief(category)},
                     {"role": "user", "content": prompt},
                 ],
             )
             text = (resp.choices[0].message.content or "").strip()
-            return text or body
+            return _apply_bold(text or body)
         except Exception as exc:
             log.error("OpenAI rephrase failed: %s", exc)
     if settings.has_anthropic:
@@ -295,36 +323,41 @@ def rephrase_body(body: str, tone: str, category: str = "security") -> str:
             resp = client.messages.create(
                 model=settings.anthropic_model,
                 max_tokens=1500,
-                system=BRAND_BRIEF,
+                system=get_brand_brief(category),
                 messages=[{"role": "user", "content": prompt}],
             )
             text = "".join(b.text for b in resp.content if b.type == "text").strip()
-            return text or body
+            return _apply_bold(text or body)
         except Exception as exc:
             log.error("Claude rephrase failed: %s", exc)
     # Mock: trivial deterministic nudge so the UI flow is testable.
-    prefix = {"punchy": "🔥 ", "formal": "", "shorter": ""}.get(tone, "")
-    return prefix + body
+    return _apply_bold(body)
 
 
 def generate_post(cand, category: str = "security") -> GeneratedPost:
+    gen: GeneratedPost | None = None
     if settings.has_gemini:
         try:
-            return _generate_with_gemini(cand, category)
+            gen = _generate_with_gemini(cand, category)
         except Exception as exc:
             log.error("Gemini generation failed for %r, trying OpenAI: %s",
                       cand.title[:60], exc)
-    if settings.has_openai:
+    if gen is None and settings.has_openai:
         try:
-            return _generate_with_openai(cand, category)
+            gen = _generate_with_openai(cand, category)
         except Exception as exc:
             log.error("OpenAI generation failed for %r, trying Claude: %s",
                       cand.title[:60], exc)
-    if settings.has_anthropic:
+    if gen is None and settings.has_anthropic:
         try:
-            return _generate_with_claude(cand, category)
+            gen = _generate_with_claude(cand, category)
         except Exception as exc:
             log.error("Claude generation failed for %r, using mock: %s",
                       cand.title[:60], exc)
-    log.info("No API key available — using mock generator.")
-    return _generate_mock(cand)
+    if gen is None:
+        log.info("No API key available — using mock generator.")
+        gen = _generate_mock(cand)
+
+    # Convert any **marked** key terms into Unicode bold before persisting.
+    gen.body = _apply_bold(gen.body)
+    return gen

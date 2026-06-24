@@ -17,6 +17,24 @@ class ImageOption(BaseModel):
     source_url: str = ""
 
 
+class MetricsOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    post_id: int
+    impressions: int
+    reactions: int
+    comments: int
+    reposts: int
+    updated_at: datetime | None = None
+
+
+class MetricsUpdate(BaseModel):
+    impressions: int | None = None
+    reactions: int | None = None
+    comments: int | None = None
+    reposts: int | None = None
+
+
 class PostOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -47,6 +65,8 @@ class PostOut(BaseModel):
     posted_at: datetime | None
     linkedin_post_id: str | None
 
+    metrics: MetricsOut | None = None
+
 
 class PostUpdate(BaseModel):
     headline: str | None = None
@@ -65,6 +85,84 @@ class ImageSearchRequest(BaseModel):
     article_image: str | None = None
     source_name: str = ""
     page: int = 1  # 1-based; passed through to each provider for Load More
+
+
+class RSSSourceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    url: str
+    category: str
+    authority: float
+    audience: str
+    enabled: bool
+    is_custom: bool
+
+
+class RSSSourceCreate(BaseModel):
+    name: str
+    url: str
+    category: str = "security"
+    authority: float = 0.8
+    audience: str = "consumer"
+
+
+class RSSSourceUpdate(BaseModel):
+    name: str | None = None
+    authority: float | None = None
+    enabled: bool | None = None
+
+
+class SourceSuggestion(BaseModel):
+    name: str
+    url: str
+    authority: float = 0.8
+    category: str = "security"
+
+
+class AISuggestRequest(BaseModel):
+    category: str = "security"
+
+
+class CandidateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    url: str
+    title: str
+    source_name: str
+    summary: str | None
+    lead_image_url: str | None
+    published_at: datetime | None
+    category: str
+    score: float
+    status: str
+
+
+class CandidateListOut(BaseModel):
+    candidates: list[CandidateOut]
+    dismissed_count: int
+    has_more: bool
+
+
+class CandidateGenerateRequest(BaseModel):
+    candidate_ids: list[int]
+
+
+class LiveSearchResult(BaseModel):
+    title: str
+    url: str
+    content: str = ""
+    published_date: str | None = None
+    source: str = ""
+
+
+class SearchGenerateRequest(BaseModel):
+    url: str
+    title: str
+    summary: str = ""
+    category: str = "security"
 
 
 class RunOut(BaseModel):

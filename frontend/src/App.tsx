@@ -2,15 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import Dashboard from "./pages/Dashboard";
 import History from "./pages/History";
+import Search from "./pages/Search";
+import Sources from "./pages/Sources";
 import type { Run } from "./types";
 
-type Tab = "dashboard" | "history";
+type Tab = "dashboard" | "history" | "sources" | "search";
+const TABS: Tab[] = ["dashboard", "history", "sources", "search"];
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [run, setRun] = useState<Run | null>(null);
   const [triggering, setTriggering] = useState(false);
   const [dashboardRefresh, setDashboardRefresh] = useState(0);
+  const [focusPostId, setFocusPostId] = useState<number | null>(null);
   const prevRunStatus = useRef<string | null>(null);
 
   const refreshRun = () => api.latestRun().then(setRun).catch(() => {});
@@ -44,6 +48,13 @@ export default function App() {
     }
   };
 
+  // Jump to the Dashboard editor with a specific post selected (re-induction
+  // of an old draft / opening a search or history result).
+  const openInEditor = (postId: number) => {
+    setFocusPostId(postId);
+    setTab("dashboard");
+  };
+
   const running = run?.status === "running";
 
   return (
@@ -54,7 +65,7 @@ export default function App() {
           <span className="text-xs text-gray-400 -ml-4">LinkedIn Agent</span>
 
           <nav className="flex gap-1 ml-4">
-            {(["dashboard", "history"] as Tab[]).map((t) => (
+            {TABS.map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -97,7 +108,16 @@ export default function App() {
         </div>
       </header>
 
-      {tab === "dashboard" ? <Dashboard refreshTrigger={dashboardRefresh} /> : <History />}
+      {tab === "dashboard" && (
+        <Dashboard
+          refreshTrigger={dashboardRefresh}
+          focusPostId={focusPostId}
+          onFocusHandled={() => setFocusPostId(null)}
+        />
+      )}
+      {tab === "history" && <History onOpenInEditor={openInEditor} />}
+      {tab === "sources" && <Sources />}
+      {tab === "search" && <Search onOpenInEditor={openInEditor} />}
     </div>
   );
 }

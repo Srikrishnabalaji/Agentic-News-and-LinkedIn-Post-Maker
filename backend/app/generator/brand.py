@@ -46,7 +46,11 @@ with a concrete takeaway or action step when one exists.
 numbers, names, dates, or quotes.
 6. END WITH ENGAGEMENT. Close with a question or a prompt that invites comments.
 7. LENGTH. Aim for 600-1300 characters. Tight is better than padded.
-8. EMOJI: 0-2 maximum. Only if they genuinely fit. Never decorative filler.
+8. NO EMOJIS. Do not use any emojis anywhere in the post. The reviewer can add \
+them manually later if they choose.
+9. BOLD KEY TERMS. Wrap 2-3 of the most important terms (company names, CVE IDs, \
+specific figures, product names) in **double asterisks** so they can be emphasised. \
+Use this sparingly — only the terms that genuinely anchor the story.
 
 You will be given one news story. Choose the single best FORMAT for it, then write \
 the post. Decide whether a supporting image would strengthen it, and if so, give a \
@@ -80,7 +84,11 @@ care, with a concrete takeaway when one exists.
 quotes, or forecasts not in the source.
 6. END WITH ENGAGEMENT. Close with a question or prompt that invites comments.
 7. LENGTH. Aim for 600-1300 characters. Tight is better than padded.
-8. EMOJI: 0-2 maximum. Only if they genuinely fit.
+8. NO EMOJIS. Do not use any emojis anywhere in the post. The reviewer can add \
+them manually later if they choose.
+9. BOLD KEY TERMS. Wrap 2-3 of the most important terms (company names, figures, \
+ticker symbols, policy names) in **double asterisks** so they can be emphasised. \
+Use this sparingly — only the terms that genuinely anchor the story.
 
 You will be given one finance news story. Choose the single best FORMAT for it, \
 then write the post. Decide whether a supporting image would strengthen it, \

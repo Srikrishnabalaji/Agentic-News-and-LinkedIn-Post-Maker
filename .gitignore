@@ -22,3 +22,7 @@ backend/.env
 Thumbs.db
 .vscode/
 .idea/
+
+# Planning docs / tooling artifacts
+IMPLEMENTATION_PLAN.md
+.code-review-graph/

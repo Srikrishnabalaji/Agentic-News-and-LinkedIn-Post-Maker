@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     pexels_api_key: str = ""
     pixabay_api_key: str = ""
 
+    # --- Live web search (Tavily; optional, 1000 free searches/month) -------
+    tavily_api_key: str = ""
+
     # --- App wiring -------------------------------------------------------
     frontend_url: str = "http://localhost:5173"
     # Shared secret guarding the internal /run/pipeline endpoint that the
@@ -76,6 +79,10 @@ class Settings(BaseSettings):
     @property
     def has_email(self) -> bool:
         return bool(self.gmail_address and self.gmail_app_password)
+
+    @property
+    def has_tavily(self) -> bool:
+        return bool(self.tavily_api_key)
 
 
 @lru_cache

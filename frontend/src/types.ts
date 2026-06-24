@@ -9,6 +9,15 @@ export interface ImageOption {
   source_url: string;
 }
 
+export interface PostMetrics {
+  post_id: number;
+  impressions: number;
+  reactions: number;
+  comments: number;
+  reposts: number;
+  updated_at: string | null;
+}
+
 export interface Post {
   id: number;
   run_id: number | null;
@@ -33,6 +42,7 @@ export interface Post {
   updated_at: string;
   posted_at: string | null;
   linkedin_post_id: string | null;
+  metrics: PostMetrics | null;
 }
 
 export interface Run {
@@ -43,6 +53,53 @@ export interface Run {
   error: string | null;
   created_at: string;
   finished_at: string | null;
+}
+
+export interface RSSSource {
+  id: number;
+  name: string;
+  url: string;
+  category: string;
+  authority: number;
+  audience: string;
+  enabled: boolean;
+  is_custom: boolean;
+}
+
+export interface SourceSuggestion {
+  name: string;
+  url: string;
+  authority: number;
+  category: string;
+}
+
+export type CandidateStatus = "pending" | "shown" | "generated" | "dismissed";
+
+export interface StoryCandidate {
+  id: number;
+  url: string;
+  title: string;
+  source_name: string;
+  summary: string | null;
+  lead_image_url: string | null;
+  published_at: string | null;
+  category: string;
+  score: number;
+  status: CandidateStatus;
+}
+
+export interface CandidateList {
+  candidates: StoryCandidate[];
+  dismissed_count: number;
+  has_more: boolean;
+}
+
+export interface LiveSearchResult {
+  title: string;
+  url: string;
+  content: string;
+  published_date: string | null;
+  source: string;
 }
 
 export const FORMAT_LABELS: Record<string, string> = {

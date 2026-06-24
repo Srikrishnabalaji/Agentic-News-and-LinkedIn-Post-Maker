@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { FORMAT_LABELS, type Post } from "../types";
+import FormattingToolbar from "./FormattingToolbar";
 import HashtagEditor from "./HashtagEditor";
 import ImagePicker from "./ImagePicker";
 import LinkedInPreview from "./LinkedInPreview";
+import MetricsPanel from "./MetricsPanel";
 import StatusBadge from "./StatusBadge";
 
 interface Props {
@@ -19,6 +21,7 @@ export default function PostEditor({ post, onChange, readOnly }: Props) {
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const taRef = useRef<HTMLTextAreaElement>(null);
 
   // Reset local state when the selected post changes.
   useEffect(() => {
@@ -114,7 +117,18 @@ export default function PostEditor({ post, onChange, readOnly }: Props) {
               ))}
             </div>
           </div>
+          {!readOnly && (
+            <div className="mb-1.5">
+              <FormattingToolbar
+                textareaRef={taRef}
+                value={body}
+                onChange={setField(setBody)}
+                disabled={!!busy}
+              />
+            </div>
+          )}
           <textarea
+            ref={taRef}
             value={body}
             onChange={(e) => setField(setBody)(e.target.value)}
             disabled={readOnly}
@@ -207,6 +221,13 @@ export default function PostEditor({ post, onChange, readOnly }: Props) {
               </button>
             )}
           </div>
+        )}
+
+        {post.status === "posted" && (
+          <MetricsPanel
+            post={post}
+            onSaved={(m) => onChange({ ...post, metrics: m })}
+          />
         )}
       </div>
 

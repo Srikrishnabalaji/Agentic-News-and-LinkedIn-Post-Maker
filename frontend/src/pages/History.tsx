@@ -1,38 +1,178 @@
-import { useEffect, useState } from "react";
-import { api } from "../api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, type HistoryParams } from "../api";
+import MetricsPanel from "../components/MetricsPanel";
 import StatusBadge from "../components/StatusBadge";
 import { FORMAT_LABELS, type Post, type PostStatus } from "../types";
 
 const FILTERS: (PostStatus | "all")[] = ["all", "draft", "approved", "posted"];
+const CATEGORIES: { value: string; label: string }[] = [
+  { value: "", label: "All topics" },
+  { value: "security", label: "Security" },
+  { value: "finance", label: "Finance" },
+];
+const SORTS: { value: HistoryParams["sort_by"]; label: string }[] = [
+  { value: "date", label: "Newest" },
+  { value: "date_asc", label: "Oldest" },
+  { value: "engagement", label: "Most engaged" },
+];
 
-export default function History() {
+const PAGE = 50;
+
+interface Props {
+  onOpenInEditor?: (postId: number) => void;
+}
+
+export default function History({ onOpenInEditor }: Props) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [filter, setFilter] = useState<PostStatus | "all">("all");
+  const [category, setCategory] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [qInput, setQInput] = useState("");
+  const [q, setQ] = useState("");
+  const [sortBy, setSortBy] = useState<HistoryParams["sort_by"]>("date");
   const [open, setOpen] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
+  // Debounce the free-text search so we don't refetch on every keystroke.
   useEffect(() => {
-    api.history(filter === "all" ? undefined : filter).then(setPosts);
-  }, [filter]);
+    const t = setTimeout(() => setQ(qInput), 300);
+    return () => clearTimeout(t);
+  }, [qInput]);
+
+  const params = useCallback(
+    (offset: number): HistoryParams => ({
+      status: filter === "all" ? undefined : filter,
+      category: category || undefined,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined,
+      q: q || undefined,
+      sort_by: sortBy,
+      limit: PAGE,
+      offset,
+    }),
+    [filter, category, dateFrom, dateTo, q, sortBy]
+  );
+
+  // Refetch from the start whenever any filter changes.
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api
+      .history(params(0))
+      .then((data) => {
+        if (cancelled) return;
+        setPosts(data);
+        setHasMore(data.length === PAGE);
+      })
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [params]);
+
+  const loadingMore = useRef(false);
+  const loadMore = async () => {
+    if (loadingMore.current) return;
+    loadingMore.current = true;
+    try {
+      const next = await api.history(params(posts.length));
+      setPosts((ps) => [...ps, ...next]);
+      setHasMore(next.length === PAGE);
+    } finally {
+      loadingMore.current = false;
+    }
+  };
+
+  const onMetrics = (postId: number, m: Post["metrics"]) =>
+    setPosts((ps) => ps.map((p) => (p.id === postId ? { ...p, metrics: m } : p)));
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <h2 className="text-lg font-semibold text-gray-800 mr-2">
-          Post history
-        </h2>
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`text-sm px-3 py-1 rounded-full capitalize ${
-              filter === f
-                ? "bg-linkedin text-white"
-                : "bg-white text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            {f}
-          </button>
-        ))}
+      <h2 className="text-lg font-semibold text-gray-800 mb-3">Post history</h2>
+
+      {/* Filter bar */}
+      <div className="bg-white rounded-lg border border-gray-200 p-3 mb-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {FILTERS.map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`text-sm px-3 py-1 rounded-full capitalize ${
+                filter === f
+                  ? "bg-linkedin text-white"
+                  : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+          <div className="ml-auto flex items-center gap-2">
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="text-sm border border-gray-200 rounded-md px-2 py-1 outline-none focus:border-linkedin"
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={sortBy}
+              onChange={(e) =>
+                setSortBy(e.target.value as HistoryParams["sort_by"])
+              }
+              className="text-sm border border-gray-200 rounded-md px-2 py-1 outline-none focus:border-linkedin"
+            >
+              {SORTS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={qInput}
+            onChange={(e) => setQInput(e.target.value)}
+            placeholder="Search headline or body…"
+            className="flex-1 min-w-[200px] text-sm border border-gray-200 rounded-md px-3 py-1.5 outline-none focus:border-linkedin"
+          />
+          <label className="text-xs text-gray-500 flex items-center gap-1">
+            From
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="text-sm border border-gray-200 rounded-md px-2 py-1 outline-none focus:border-linkedin"
+            />
+          </label>
+          <label className="text-xs text-gray-500 flex items-center gap-1">
+            To
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="text-sm border border-gray-200 rounded-md px-2 py-1 outline-none focus:border-linkedin"
+            />
+          </label>
+          {(dateFrom || dateTo || qInput) && (
+            <button
+              onClick={() => {
+                setDateFrom("");
+                setDateTo("");
+                setQInput("");
+              }}
+              className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1"
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
       <p className="text-xs text-gray-400 mb-3">
@@ -59,7 +199,12 @@ export default function History() {
                   </span>
                 )}
               </span>
-              <span className="text-xs text-gray-400">
+              {p.metrics && (
+                <span className="text-[11px] text-gray-400 shrink-0">
+                  {p.metrics.impressions.toLocaleString()} impr
+                </span>
+              )}
+              <span className="text-xs text-gray-400 shrink-0">
                 {new Date(p.created_at).toLocaleDateString()}
               </span>
               <StatusBadge status={p.status} />
@@ -70,24 +215,53 @@ export default function History() {
                 <div className="mt-2 text-linkedin text-xs">
                   {p.hashtags.map((h) => `#${h}`).join(" ")}
                 </div>
-                {p.source_url && (
-                  <a
-                    href={p.source_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs text-gray-400 hover:underline mt-2 inline-block"
-                  >
-                    Source: {p.source_name} ↗
-                  </a>
+                <div className="flex items-center gap-3 mt-2">
+                  {p.source_url && (
+                    <a
+                      href={p.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-gray-400 hover:underline inline-block"
+                    >
+                      Source: {p.source_name} ↗
+                    </a>
+                  )}
+                  {onOpenInEditor && (
+                    <button
+                      onClick={() => onOpenInEditor(p.id)}
+                      className="text-xs text-linkedin hover:underline font-semibold"
+                    >
+                      Open in editor →
+                    </button>
+                  )}
+                </div>
+                {p.status === "posted" && (
+                  <div className="mt-3">
+                    <MetricsPanel
+                      post={p}
+                      onSaved={(m) => onMetrics(p.id, m)}
+                    />
+                  </div>
                 )}
               </div>
             )}
           </div>
         ))}
-        {!posts.length && (
+        {loading && (
+          <div className="text-gray-400 text-sm p-6 text-center">Loading…</div>
+        )}
+        {!loading && !posts.length && (
           <div className="text-gray-400 text-sm p-6 text-center">
-            No posts in this view yet.
+            No posts match these filters.
           </div>
+        )}
+        {hasMore && !loading && (
+          <button
+            onClick={loadMore}
+            className="w-full text-sm py-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+          >
+            Load more
+          </button>
         )}
       </div>
     </div>

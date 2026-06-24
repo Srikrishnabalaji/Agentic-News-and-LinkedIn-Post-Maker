@@ -56,9 +56,33 @@ def _apply_migrations() -> None:
                 pass  # column already exists
 
 
+def _seed_sources() -> None:
+    """Populate rss_sources from the hardcoded list on first boot only."""
+    from sqlalchemy import select
+
+    from .models import RSSSource
+    from .scraper.sources import SOURCES
+
+    db = SessionLocal()
+    try:
+        already = db.execute(select(RSSSource.id).limit(1)).first()
+        if already:
+            return
+        for s in SOURCES:
+            db.add(RSSSource(
+                name=s.name, url=s.feed_url, category=s.category,
+                authority=s.authority, audience=s.audience,
+                enabled=True, is_custom=False,
+            ))
+        db.commit()
+    finally:
+        db.close()
+
+
 def init_db() -> None:
     """Create tables if they do not exist (used for local/dev + first boot)."""
     from . import models  # noqa: F401  (ensure models are registered)
 
     Base.metadata.create_all(bind=engine)
     _apply_migrations()
+    _seed_sources()

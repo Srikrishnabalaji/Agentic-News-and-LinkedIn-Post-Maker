@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .db import init_db
-from .routes import images, posts, runs
+from .routes import candidates, images, posts, runs, search, sources
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
@@ -35,6 +35,9 @@ app.add_middleware(
 app.include_router(posts.router)
 app.include_router(images.router)
 app.include_router(runs.router)
+app.include_router(sources.router)
+app.include_router(candidates.router)
+app.include_router(search.router)
 
 
 @app.on_event("startup")
@@ -62,6 +65,7 @@ def health():
         "gemini": settings.has_gemini,
         "anthropic": settings.has_anthropic,
         "email": settings.has_email,
+        "tavily": settings.has_tavily,
     }
 
 

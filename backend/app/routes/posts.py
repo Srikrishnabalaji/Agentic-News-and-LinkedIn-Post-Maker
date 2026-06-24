@@ -1,18 +1,18 @@
 """Post CRUD, regeneration, and status transitions."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..generator.images import find_images
 from ..generator.post import generate_post, rephrase_body
-from ..models import DailyRun, Post, PostStatus, RunStatus, Source
+from ..models import DailyRun, Post, PostMetrics, PostStatus, RunStatus, Source
 from ..ranking.scorer import is_pivotal, topic_key
-from ..schemas import PostOut, PostUpdate, StatusUpdate
+from ..schemas import MetricsOut, MetricsUpdate, PostOut, PostUpdate, StatusUpdate
 from ..scraper.rss import Candidate
 
 router = APIRouter(prefix="/posts", tags=["posts"])
@@ -46,10 +46,46 @@ def posts_history(
     limit: int = Query(50, le=200),
     offset: int = 0,
     status: PostStatus | None = None,
+    category: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    q: str | None = None,
+    sort_by: str = Query("date", pattern="^(date|date_asc|engagement)$"),
 ):
-    stmt = select(Post).order_by(Post.created_at.desc())
+    """History with filtering (category/date/text), sorting, and pagination.
+
+    `sort_by=engagement` ranks by reactions + comments*2 + reposts*3 using a
+    LEFT JOIN onto post_metrics, so posts without metrics sort last (score 0).
+    """
+    stmt = select(Post)
+
     if status:
         stmt = stmt.where(Post.status == status)
+    if category:
+        stmt = stmt.where(Post.category == category)
+    if date_from:
+        stmt = stmt.where(Post.created_at >= datetime.combine(date_from, time.min))
+    if date_to:
+        # Inclusive of the whole end day.
+        stmt = stmt.where(Post.created_at <= datetime.combine(date_to, time.max))
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(or_(Post.headline.ilike(like), Post.body.ilike(like)))
+
+    if sort_by == "engagement":
+        engagement = (
+            func.coalesce(PostMetrics.reactions, 0)
+            + func.coalesce(PostMetrics.comments, 0) * 2
+            + func.coalesce(PostMetrics.reposts, 0) * 3
+        )
+        stmt = stmt.outerjoin(PostMetrics, PostMetrics.post_id == Post.id).order_by(
+            engagement.desc(), Post.created_at.desc()
+        )
+    elif sort_by == "date_asc":
+        stmt = stmt.order_by(Post.created_at.asc())
+    else:
+        stmt = stmt.order_by(Post.created_at.desc())
+
     return db.execute(stmt.limit(limit).offset(offset)).scalars().all()
 
 
@@ -82,6 +118,34 @@ def set_status(post_id: int, payload: StatusUpdate, db: Session = Depends(get_db
     db.commit()
     db.refresh(post)
     return post
+
+
+@router.get("/{post_id}/metrics", response_model=MetricsOut)
+def get_metrics(post_id: int, db: Session = Depends(get_db)):
+    """Return manually-recorded LinkedIn performance for a post."""
+    post = _get_post(db, post_id)
+    if not post.metrics:
+        raise HTTPException(404, "No metrics recorded for this post")
+    return post.metrics
+
+
+@router.put("/{post_id}/metrics", response_model=MetricsOut)
+def upsert_metrics(
+    post_id: int, payload: MetricsUpdate, db: Session = Depends(get_db)
+):
+    """Create or update performance metrics for a post (upsert)."""
+    post = _get_post(db, post_id)
+    metrics = post.metrics
+    if metrics is None:
+        metrics = PostMetrics(post_id=post.id)
+        db.add(metrics)
+    data = payload.model_dump(exclude_unset=True)
+    for field in ("impressions", "reactions", "comments", "reposts"):
+        if data.get(field) is not None:
+            setattr(metrics, field, max(0, int(data[field])))
+    db.commit()
+    db.refresh(metrics)
+    return metrics
 
 
 @router.post("/{post_id}/rephrase", response_model=PostOut)
