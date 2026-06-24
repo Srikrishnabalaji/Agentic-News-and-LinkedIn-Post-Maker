@@ -8,6 +8,8 @@ import LinkedInPreview from "./LinkedInPreview";
 import MetricsPanel from "./MetricsPanel";
 import StatusBadge from "./StatusBadge";
 
+const MENTION_RE = /@[A-Za-z]\w*(?:\s+[A-Z]\w*)?/g;
+
 interface Props {
   post: Post;
   onChange: (p: Post) => void;
@@ -21,6 +23,7 @@ export default function PostEditor({ post, onChange, readOnly }: Props) {
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [tagReminder, setTagReminder] = useState<string[] | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
   // Reset local state when the selected post changes.
@@ -56,11 +59,27 @@ export default function PostEditor({ post, onChange, readOnly }: Props) {
     }
   };
 
+  const showMentionReminder = (text: string) => {
+    const mentions = text.match(MENTION_RE);
+    if (mentions) {
+      setTagReminder([...new Set(mentions)]);
+      setTimeout(() => setTagReminder(null), 6000);
+    }
+  };
+
   const copy = async () => {
     const tagLine = hashtags.map((h) => `#${h}`).join(" ");
     await navigator.clipboard.writeText(tagLine ? `${body}\n\n${tagLine}` : body);
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
+    showMentionReminder(body);
+  };
+
+  const handleNativeCopy = () => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const selected = ta.value.substring(ta.selectionStart, ta.selectionEnd) || ta.value;
+    showMentionReminder(selected);
   };
 
   const setField = <T,>(setter: (v: T) => void) => (v: T) => {
@@ -131,6 +150,7 @@ export default function PostEditor({ post, onChange, readOnly }: Props) {
             ref={taRef}
             value={body}
             onChange={(e) => setField(setBody)(e.target.value)}
+            onCopy={handleNativeCopy}
             disabled={readOnly}
             rows={12}
             className="w-full text-sm border border-gray-200 rounded-lg p-3 outline-none focus:border-linkedin resize-y leading-relaxed"
@@ -188,6 +208,17 @@ export default function PostEditor({ post, onChange, readOnly }: Props) {
                 ⬇ Open image
               </a>
             )}
+          </div>
+        )}
+        {tagReminder && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-amber-50 border border-amber-300 text-amber-800 text-sm font-medium px-4 py-3 rounded-xl shadow-lg">
+            <span>🏷️ Remember to tag in LinkedIn: {tagReminder.join(", ")}</span>
+            <button
+              onClick={() => setTagReminder(null)}
+              className="text-amber-500 hover:text-amber-800 font-bold leading-none"
+            >
+              ✕
+            </button>
           </div>
         )}
 

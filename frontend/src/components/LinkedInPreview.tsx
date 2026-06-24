@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { LINKEDIN_LIMIT } from "../types";
 
 interface Props {
@@ -5,6 +6,29 @@ interface Props {
   hashtags: string[];
   imageUrl: string | null;
   imageAttribution: string | null;
+}
+
+// Highlight @mentions (single word or two capitalised words) and #hashtags
+// as blue spans, matching LinkedIn's native rendering style.
+const INLINE_RE = /(@[A-Za-z]\w*(?:\s+[A-Z]\w*)?|#\w+)/g;
+
+function renderText(text: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let last = 0;
+  let key = 0;
+  let match: RegExpExecArray | null;
+  INLINE_RE.lastIndex = 0;
+  while ((match = INLINE_RE.exec(text)) !== null) {
+    if (match.index > last) nodes.push(text.slice(last, match.index));
+    nodes.push(
+      <span key={key++} className="text-linkedin font-medium">
+        {match[0]}
+      </span>
+    );
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return nodes;
 }
 
 // Mimics how a LinkedIn feed post renders, including the ~210-char
@@ -42,12 +66,12 @@ export default function LinkedInPreview({
         <div className="px-4 pb-2 text-[14px] text-gray-900 whitespace-pre-wrap leading-snug">
           {truncated ? (
             <>
-              {fullText.slice(0, SEE_MORE)}
+              {renderText(fullText.slice(0, SEE_MORE))}
               <span className="text-gray-400">… </span>
               <span className="text-gray-500">see more</span>
             </>
           ) : (
-            fullText
+            renderText(fullText)
           )}
         </div>
 
