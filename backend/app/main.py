@@ -32,12 +32,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(posts.router)
-app.include_router(images.router)
-app.include_router(runs.router)
-app.include_router(sources.router)
-app.include_router(candidates.router)
-app.include_router(search.router)
+app.include_router(posts.router, prefix="/api")
+app.include_router(images.router, prefix="/api")
+app.include_router(runs.router, prefix="/api")
+app.include_router(sources.router, prefix="/api")
+app.include_router(candidates.router, prefix="/api")
+app.include_router(search.router, prefix="/api")
 
 
 @app.on_event("startup")
